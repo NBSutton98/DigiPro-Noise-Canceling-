@@ -2,8 +2,7 @@
 // Created by SBNut on 2025-11-04.
 //
 
-#include "AudioEngine.h"
-
+#include "AudioEngine.hpp"
 
 void AudioEngine::prepare(double sr, int blockSize){
 sr_ = sr; block_ = blockSize;

@@ -1,47 +1,33 @@
-//
-// Created by SBNut on 2025-11-04.
-//
-
-#ifndef MAINCOMPONENT_HPP
-#define MAINCOMPONENT_HPP
-
-
-
 #pragma once
+#include <juce_audio_utils/juce_audio_utils.h>
 #include <juce_gui_extra/juce_gui_extra.h>
-#include "AudioEngine.h"
+#include "AudioEngine.hpp"
 
-
-class MainComponent : public juce::AudioAppComponent,
-private juce::Timer {
+class MainComponent : public juce::AudioAppComponent, private juce::Timer {
 public:
-MainComponent();
-~MainComponent() override;
+  MainComponent();
+  ~MainComponent() override;
 
-
-void prepareToPlay (int samplesPerBlockExpected, double sampleRate) override;
-void getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill) override;
-void releaseResources() override;
-
-
-void resized() override;
-
+  void prepareToPlay (int samplesPerBlockExpected, double sampleRate) override;
+  void getNextAudioBlock (const juce::AudioSourceChannelInfo& bufferToFill) override;
+  void releaseResources() override;
+  void resized() override;
 
 private:
-void timerCallback() override;
+  void timerCallback() override;
 
+  // DSP engine
+  AudioEngine engine_;
 
-AudioEngine engine_;
+  // Controls
+  juce::Slider mu_, L_, postStrength_;
+  juce::ToggleButton freeze_{"Freeze learning"}, enablePost_{"Enable spectral cleaner"};
+  juce::ComboBox Nbox_, winBox_;
+  juce::Label lMu_, lL_, lN_, lWin_, lPost_;
 
+  // Live feedback + devices
+  juce::AudioVisualiserComponent outVis_{2};   // stereo output meter/scope
+  juce::TextButton deviceBtn_{"Audio devices"};
 
-juce::Slider mu_, L_, postStrength_;
-juce::ToggleButton freeze_{"Freeze adaptation"}, enablePost_{"Enable post-filter"};
-juce::ComboBox Nbox_, winBox_;
-juce::Label lMu_, lL_, lN_, lWin_, lPost_;
-
-
-JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
+  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };
-
-
-#endif //MAINCOMPONENT_HPP
