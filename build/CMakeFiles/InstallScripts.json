@@ -1,0 +1,11 @@
+{
+	"InstallScripts" : 
+	[
+		"C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/cmake_install.cmake",
+		"C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/JUCE/cmake_install.cmake",
+		"C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/JUCE/modules/cmake_install.cmake",
+		"C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/JUCE/extras/Build/cmake_install.cmake",
+		"C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/JUCE/extras/Build/juceaide/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

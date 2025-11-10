@@ -7,9 +7,9 @@
 
 #pragma once
 #include <juce_dsp/juce_dsp.h>
-#include "NLMSFilter.h"
-#include "STFTProcessor.h"
-#include "WienerPost.h"
+#include "NLMSFilter.hpp"
+#include "STFTProcessor.hpp"
+#include "WienerPost.hpp"
 
 
 class AudioEngine {

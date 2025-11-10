@@ -1,0 +1,29 @@
+# ninja log v6
+11	101	7845200389632600	C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/CMakeFiles/cmake.verify_globs	fde2fb5f3647acb6
+105	264	7845200392055641	NCliteApp_artefacts/JuceLibraryCode/NCliteApp_resources.rc	90dc8d01b75cdcf
+105	264	7845200392055641	C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/NCliteApp_artefacts/JuceLibraryCode/NCliteApp_resources.rc	90dc8d01b75cdcf
+318	798	7845200392691577	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_audio_processors/juce_audio_processors_lv2_libs.cpp.obj	4927029e1958808f
+314	1160	7845200392661515	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_audio_processors/juce_audio_processors_ara.cpp.obj	6bd8090f75fac
+349	1519	7845200393006946	CMakeFiles/NCliteApp_rc_lib.dir/NCliteApp_artefacts/JuceLibraryCode/NCliteApp_resources.rc.res	a8d19ce5a05511d8
+280	1524	7845200392321242	CMakeFiles/NCliteApp.dir/NLMSFilter.cpp.obj	b33418c9dd54760
+287	4028	7845200392391290	CMakeFiles/NCliteApp.dir/WienerPost.cpp.obj	d87905180d64c4a8
+274	6734	7845200392251191	CMakeFiles/NCliteApp.dir/AudioEngine.cpp.obj	442898963c7df30c
+339	6799	7845200392906892	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_data_structures/juce_data_structures.cpp.obj	665f0a19140624f1
+283	6815	7845200392351247	CMakeFiles/NCliteApp.dir/STFTProcessor.cpp.obj	705517463a9f98c4
+335	7684	7845200392866826	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_events/juce_events.cpp.obj	c2794e3c3482e9fc
+298	8602	7845200392501417	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_audio_basics/juce_audio_basics.cpp.obj	6fe5184a0991a286
+291	9411	7845200392421357	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_dsp/juce_dsp.cpp.obj	fcfed37638ea6722
+295	10665	7845200392461364	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_audio_formats/juce_audio_formats.cpp.obj	d4c9bfe9ff845444
+264	10730	7845200392151127	CMakeFiles/NCliteApp.dir/Main.cpp.obj	d31c92f3f3fa7d46
+269	10789	7845200392211171	CMakeFiles/NCliteApp.dir/MainComponent.cpp.obj	9caf1ed6c367eb0b
+322	10846	7845200392736779	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_gui_extra/juce_gui_extra.cpp.obj	6e581277571dbb94
+302	11576	7845200392541427	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_core/juce_core.cpp.obj	296a39f5f59f6779
+344	11731	7845200392956890	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_audio_devices/juce_audio_devices.cpp.obj	70bf673b3f46f564
+331	11758	7845200392826840	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_graphics/juce_graphics.cpp.obj	e94fe064f2024f2b
+306	11773	7845200392571412	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_audio_utils/juce_audio_utils.cpp.obj	550f81cd55c2985c
+310	13578	7845200392621551	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_audio_processors/juce_audio_processors.cpp.obj	e847cfa151783941
+326	19747	7845200392766784	CMakeFiles/NCliteApp.dir/JUCE/modules/juce_gui_basics/juce_gui_basics.cpp.obj	bf00bfd7c4d57e95
+19748	21634	7845200586927088	NCliteApp_artefacts/Debug/NClite.exe	5ae776507dfe926
+83	148	7845202719622994	C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/CMakeFiles/cmake.verify_globs	fde2fb5f3647acb6
+185	3508	7845202720646557	CMakeFiles/NCliteApp.dir/MainComponent.cpp.obj	9caf1ed6c367eb0b
+3509	3899	7845202753857281	NCliteApp_artefacts/Debug/NClite.exe	5ae776507dfe926

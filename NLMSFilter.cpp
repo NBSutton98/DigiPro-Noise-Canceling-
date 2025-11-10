@@ -2,7 +2,7 @@
 // Created by SBNut on 2025-11-04.
 //
 
-#include "NLMSFilter.h"
+#include "NLMSFilter.hpp"
 #include <algorithm>
 #include <cmath>
 
