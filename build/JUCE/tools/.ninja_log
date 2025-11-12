@@ -1,10 +1,11 @@
 # ninja log v6
-45	172	7845200238745188	C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/JUCE/tools/CMakeFiles/cmake.verify_globs	b3ff8c5c5065bf9a
+56	145	7846890660750596	C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/JUCE/tools/CMakeFiles/cmake.verify_globs	b3ff8c5c5065bf9a
 206	1831	7845200240362032	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_data_structures/juce_data_structures.cpp.obj	f47a42bc36f02dd
 196	2490	7845200240250416	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_events/juce_events.cpp.obj	da68d91a63f03057
 175	2637	7845200240047150	extras/Build/juceaide/CMakeFiles/juceaide.dir/Main.cpp.obj	eab5aa7a09bc2860
 181	2722	7845200240098644	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/juce_build_tools/juce_build_tools.cpp.obj	f65d3a5f394acb09
 201	4062	7845200240310481	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_core/juce_core.cpp.obj	7d97ca7ddc056fc3
-190	4622	7845200240200445	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_graphics/juce_graphics.cpp.obj	8374874e58d8a751
 186	11451	7845200240151302	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_gui_basics/juce_gui_basics.cpp.obj	a3b79ce2ff0e5540
+190	4622	7845200240200445	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_graphics/juce_graphics.cpp.obj	8374874e58d8a751
 11452	12665	7845200352816610	extras/Build/juceaide/juceaide_artefacts/Debug/juceaide.exe	a0540d7f338fea8f
+51	137	7846892900134677	C:/Users/bduva/Desktop/CST Term 3/comp 3931 - Digi Pro/DigiPro-Noise-Canceling-/build/JUCE/tools/CMakeFiles/cmake.verify_globs	b3ff8c5c5065bf9a

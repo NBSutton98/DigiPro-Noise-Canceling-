@@ -1,8 +1,0 @@
-# ninja log v6
-129	1459	7845134257787356	C:/Users/SBNut/OOP/DigiPro-Noise-Canceling-/cmake-build-debug/JUCE/tools/CMakeFiles/cmake.verify_globs	3b8abc15b7a95f71
-1597	25928	7845134272436063	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_data_structures/juce_data_structures.cpp.obj	ae79831e07da026a
-1467	30829	7845134271138164	extras/Build/juceaide/CMakeFiles/juceaide.dir/Main.cpp.obj	291fc9acc305aea
-1492	31130	7845134271394699	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/juce_build_tools/juce_build_tools.cpp.obj	e29fe4f8f77261c3
-1550	46028	7845134271968629	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_events/juce_events.cpp.obj	12344fd236365f88
-1531	94943	7845134271775086	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_graphics/juce_graphics.cpp.obj	788350b73f431425
-1577	107412	7845134272230612	extras/Build/juceaide/CMakeFiles/juceaide.dir/__/__/__/modules/juce_core/juce_core.cpp.obj	dc3e73a5b59701fb
