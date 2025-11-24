@@ -1,66 +1,91 @@
 #include "STFTProcessor.hpp"
 #include "WienerPost.hpp"
-#include <cstring>
-#include <cmath>
 
-void STFTProcessor::prepare(double sr, int N){ sr_ = sr; setFFTSize(N); }
-void STFTProcessor::setFFTSize(int N){
-  if (N!=512 && N!=1024 && N!=2048) N = 1024;
-  N_ = N; hop_ = N_/4; order_ = (int)std::round(std::log2((double)N_));
-  fft_ = juce::dsp::FFT(order_);
-  buildWindow(); ensureBuffers();
-  framePos_ = 0;
-}
-void STFTProcessor::setWindowType(int id){ winType_ = id; buildWindow(); }
-void STFTProcessor::buildWindow(){
-  window_.assign(N_, 1.0f);
-  for (int n=0;n<N_;++n){
-    float x = float(n) / float(N_-1);
-    float w = 1.0f;
-    switch(winType_){
-      case 1: w = 0.5f * (1.0f - std::cos(2.0f*juce::MathConstants<float>::pi * x)); break;
-      case 2: w = 0.54f - 0.46f*std::cos(2.0f*juce::MathConstants<float>::pi * x); break;
-      case 3: w = 0.42f - 0.5f*std::cos(2.0f*juce::MathConstants<float>::pi * x)
-                    + 0.08f*std::cos(4.0f*juce::MathConstants<float>::pi * x); break;
-    }
-    window_[n] = w;
-  }
-}
-void STFTProcessor::ensureBuffers(){
-  frame_.assign(N_, 0.0f);
-  fftBuf_.assign(2*N_, 0.0f);
-  ola_.assign(N_ + hop_, 0.0f);
-}
-void STFTProcessor::processChannelInPlace(juce::AudioBuffer<float>& buf, int start, int numSamples, int channel,
-                                          WienerPost& post){
-  auto* x = buf.getWritePointer(channel, start);
-  for (int n=0; n<numSamples; ++n) {
-    frame_[framePos_] = x[n];
-    ++framePos_;
+void STFTProcessor::prepare(double sr, int maxBlockSize)
+{
+    sr_ = sr;
+    
+    // Reset indices
+    fifoIndex_ = 0;
 
-    if (framePos_ >= N_) {
-        for (int i=0;i<N_;++i){ fftBuf_[2*i] = frame_[i]*window_[i]; fftBuf_[2*i+1] = 0.0f; }
-        fft_.performRealOnlyForwardTransform(fftBuf_.data());
-        post.applyRealPacked(fftBuf_.data(), N_);
-        fft_.performRealOnlyInverseTransform(fftBuf_.data());
+    // Resize buffers. We need enough space for history.
+    // 2x FFT size is usually sufficient for the ring buffer logic used here.
+    inputFifo_.assign(fftSize_, 0.0f);
+    outputFifo_.assign(fftSize_, 0.0f);
+    
+    // Work buffer needs to be 2x size for juce::dsp::FFT real-to-complex format
+    fftWorkBuffer_.resize(fftSize_ * 2); 
+}
 
-        // write back with scaling; keep indices inside [0, numSamples)
-        const float scale = 2.0f / float(N_);
-        for (int i=0;i<N_;++i){
-            int outIdx = (n - (N_-1)) + i;
-            if (outIdx >= 0 && outIdx < numSamples)
-                x[outIdx] += fftBuf_[i] * window_[i] * scale;
+void STFTProcessor::processBlock(const juce::AudioBuffer<float>& input, 
+                                 juce::AudioBuffer<float>& output, 
+                                 WienerPost& post)
+{
+    // For this Lite version, we process Channel 0 (Mono)
+    // If you use stereo, you would need two instances of this class.
+    auto* src = input.getReadPointer(0);
+    auto* dst = output.getWritePointer(0);
+    const int numSamples = input.getNumSamples();
+
+    for (int i = 0; i < numSamples; ++i)
+    {
+        // 1. Push new sample into Input FIFO
+        inputFifo_[fifoIndex_] = src[i];
+
+        // 2. Pull processed sample from Output FIFO
+        dst[i] = outputFifo_[fifoIndex_];
+        
+        // Clear the output slot so it is ready to accumulate future overlaps
+        outputFifo_[fifoIndex_] = 0.0f;
+
+        // 3. Increment Ring Index
+        fifoIndex_++;
+        if (fifoIndex_ >= fftSize_)
+            fifoIndex_ = 0;
+
+        // 4. Process Frame if we hit a Hop boundary
+        // We process whenever we have gathered 'hopSize_' new samples
+        if (fifoIndex_ % hopSize_ == 0)
+        {
+            // Unwrap the Ring Buffer into a linear array for FFT
+            int idx = fifoIndex_ - fftSize_;
+            if (idx < 0) idx += fftSize_;
+            
+            for (int j = 0; j < fftSize_; ++j)
+            {
+                fftWorkBuffer_[j] = inputFifo_[idx];
+                idx = (idx + 1) % fftSize_;
+            }
+
+            // Apply Analysis Window
+            window_.multiplyWithWindowingTable(fftWorkBuffer_.data(), fftSize_);
+
+            // Forward FFT (Time -> Frequency)
+            fft_.performRealOnlyForwardTransform(fftWorkBuffer_.data());
+
+            // --- WIENER FILTERING ---
+            post.applyRealPacked(fftWorkBuffer_.data(), fftSize_);
+            // ------------------------
+
+            // Inverse FFT (Frequency -> Time)
+            fft_.performRealOnlyInverseTransform(fftWorkBuffer_.data());
+
+            // Overlap-Add into Output FIFO
+            // For Hann window with 75% overlap, we strictly don't need a synthesis window
+            // if we scale correctly. A scaling factor is needed because OLA adds up energy.
+            // Scaling by 2/3rds of hop ratio is a common approximation, or just empirical tuning.
+            const float windowCorrection = 1.0f / 1.5f; // Empirical scaling for Hann 75%
+
+            idx = fifoIndex_ - fftSize_;
+            if (idx < 0) idx += fftSize_;
+
+            for (int j = 0; j < fftSize_; ++j)
+            {
+                // Accumulate result
+                outputFifo_[idx] += fftWorkBuffer_[j] * windowCorrection;
+                
+                idx = (idx + 1) % fftSize_;
+            }
         }
-
-        // slide window by hop
-        if (hop_ < N_) {
-            std::memmove(frame_.data(), frame_.data() + hop_, sizeof(float)*(N_ - hop_));
-            std::fill(frame_.begin() + (N_ - hop_), frame_.end(), 0.0f);
-            framePos_ = N_ - hop_;
-        } else {
-            std::fill(frame_.begin(), frame_.end(), 0.0f);
-            framePos_ = 0;
-        }
     }
-}
 }
