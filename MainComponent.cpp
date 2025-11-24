@@ -1,45 +1,59 @@
+/**
+ * @file MainComponent.cpp
+ * @brief Implementation of the UI and Custom LookAndFeel.
+ */
+
 #include "MainComponent.hpp"
 
+// ==============================================================================
+// Custom Theme (Look And Feel)
+// ==============================================================================
 namespace Styling
 {
-  const juce::Colour bgDark = juce::Colour(0xFF161B22);
-  const juce::Colour panelDark = juce::Colour(0xFF21262D);
-  const juce::Colour accent = juce::Colour(0xFF58A6FF);
+  const juce::Colour bgDark = juce::Colour(0xFF161B22);    // Github Dark Dimmed
+  const juce::Colour panelDark = juce::Colour(0xFF21262D); // Panel Background
+  const juce::Colour accent = juce::Colour(0xFF58A6FF);    // Electric Blue
   const juce::Colour textBright = juce::Colour(0xFFF0F6FC);
   const juce::Colour textDim = juce::Colour(0xFF8B949E);
 
+  /**
+   * @class ModernLNF
+   * @brief Overrides default JUCE drawing methods to create a flat, modern aesthetic.
+   */
   class ModernLNF : public juce::LookAndFeel_V4
   {
   public:
     ModernLNF()
     {
+      // Set global color palette
       setColour(juce::ResizableWindow::backgroundColourId, bgDark);
       setColour(juce::Label::textColourId, textBright);
       setColour(juce::TextButton::buttonColourId, panelDark);
       setColour(juce::TextButton::textColourOffId, textBright);
       setColour(juce::ComboBox::backgroundColourId, panelDark);
       setColour(juce::ComboBox::outlineColourId, juce::Colours::transparentBlack);
+
+      // Tooltip Styling
       setColour(juce::TooltipWindow::backgroundColourId, juce::Colour(0xFF111111));
       setColour(juce::TooltipWindow::textColourId, textBright);
       setColour(juce::TooltipWindow::outlineColourId, accent);
     }
 
-    // --- FIXED: Modern Fader Style Slider ---
+    /** Draws the custom "Power Gauge" Fader for the Mic Boost. */
     void drawLinearSlider(juce::Graphics &g, int x, int y, int width, int height,
                           float sliderPos, float minSliderPos, float maxSliderPos,
                           const juce::Slider::SliderStyle style, juce::Slider &slider) override
     {
-      juce::ignoreUnused(style, slider);
+      juce::ignoreUnused(minSliderPos, maxSliderPos, style, slider);
 
-      // 1. Draw Track (The dark background line)
+      // 1. Draw Track (Recessed Slot)
       auto trackHeight = 6.0f;
       auto trackY = y + (height - trackHeight) * 0.5f;
 
-      // inside drawLinearSlider...
       g.setColour(juce::Colours::black.withAlpha(0.5f));
-      // FIX: (float) casts added below
       g.fillRoundedRectangle((float)x, trackY, (float)width, trackHeight, trackHeight / 2.0f);
 
+      // 2. Draw Fill (Gradient from Dark Blue to Bright Cyan)
       float fillWidth = sliderPos - (float)x;
       if (fillWidth > 0)
       {
@@ -47,42 +61,41 @@ namespace Styling
         g.fillRoundedRectangle((float)x, trackY, fillWidth, trackHeight, trackHeight / 2.0f);
       }
 
-      // 3. Draw Thumb (The White Handle)
+      // 3. Draw Thumb (White Handle) with Glow
       float thumbSize = 16.0f;
       g.setColour(juce::Colours::white);
       g.fillEllipse(sliderPos - thumbSize * 0.5f, y + (height - thumbSize) * 0.5f, thumbSize, thumbSize);
 
-      // Thumb Shadow/Glow
-      g.setColour(accent.withAlpha(0.4f));
+      g.setColour(accent.withAlpha(0.4f)); // Glow ring
       g.drawEllipse(sliderPos - thumbSize * 0.5f, y + (height - thumbSize) * 0.5f, thumbSize, thumbSize, 2.0f);
     }
 
+    /** Draws the iOS-style Pill Toggles. */
     void drawToggleButton(juce::Graphics &g, juce::ToggleButton &button,
                           bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override
     {
       juce::ignoreUnused(shouldDrawButtonAsHighlighted, shouldDrawButtonAsDown);
-      auto bounds = button.getLocalBounds().toFloat();
+      auto bounds = button.getLocalBounds().toFloat().reduced(2);
       bool on = button.getToggleState();
 
-      // Draw Text on the LEFT
+      // Draw Text Label
       g.setFont(juce::Font(14.0f));
       g.setColour(textBright);
-      // Reserve 34px on right for the switch
-      g.drawText(button.getButtonText(), bounds.removeFromLeft(bounds.getWidth() - 34), juce::Justification::centredLeft);
+      g.drawText(button.getButtonText(), bounds.removeFromRight(bounds.getWidth() - 38).toNearestInt(), juce::Justification::centredLeft);
 
-      // Draw Switch (Pill) on the RIGHT
-      auto toggleRect = bounds.reduced(0, 6); // Center vertically
-
+      // Draw Switch Body
+      auto toggleRect = bounds.removeFromLeft(34).reduced(0, 6);
       g.setColour(on ? accent : juce::Colours::darkgrey);
       g.fillRoundedRectangle(toggleRect, toggleRect.getHeight() / 2.0f);
 
-      // Draw Thumb (Circle)
+      // Draw Switch Thumb
       float thumbSize = toggleRect.getHeight() - 4;
       float thumbX = on ? (toggleRect.getRight() - thumbSize - 2) : (toggleRect.getX() + 2);
       g.setColour(juce::Colours::white);
       g.fillEllipse(thumbX, toggleRect.getY() + 2, thumbSize, thumbSize);
     }
 
+    /** Draws the modern "Arc" style rotary knob. */
     void drawRotarySlider(juce::Graphics &g, int x, int y, int width, int height, float sliderPos,
                           const float rotaryStartAngle, const float rotaryEndAngle, juce::Slider &slider) override
     {
@@ -91,16 +104,21 @@ namespace Styling
       auto centreX = (float)x + (float)width * 0.5f;
       auto centreY = (float)y + (float)height * 0.5f;
       auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
+
+      // Background Arc
       juce::Path bgArc;
       bgArc.addCentredArc(centreX, centreY, radius, radius, 0.0f, rotaryStartAngle, rotaryEndAngle, true);
       g.setColour(juce::Colours::black.withAlpha(0.4f));
       g.strokePath(bgArc, juce::PathStrokeType(6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
+
+      // Value Arc (Active)
       juce::Path valArc;
       valArc.addCentredArc(centreX, centreY, radius, radius, 0.0f, rotaryStartAngle, angle, true);
       g.setColour(accent);
       g.strokePath(valArc, juce::PathStrokeType(6.0f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     }
 
+    /** Draws flat, rounded buttons. */
     void drawButtonBackground(juce::Graphics &g, juce::Button &button, const juce::Colour &backgroundColour,
                               bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override
     {
@@ -119,15 +137,20 @@ namespace Styling
   };
 }
 
+// ==============================================================================
+// Main Component Implementation
+// ==============================================================================
+
 MainComponent::MainComponent()
 {
+  // Apply Custom Theme
   lnf_ = std::make_unique<Styling::ModernLNF>();
   setLookAndFeel(lnf_.get());
 
   setSize(900, 600);
-  setAudioChannels(2, 2);
+  setAudioChannels(2, 2); // Request Input/Output
 
-  // HEADER
+  // --- Initialize Header ---
   toggleOn_.setButtonText("Processing Active");
   toggleOn_.setToggleState(true, juce::dontSendNotification);
   toggleOn_.setTooltip("Master Bypass.");
@@ -138,7 +161,7 @@ MainComponent::MainComponent()
   resetBtn_.setButtonText("Reset Defaults");
   addAndMakeVisible(resetBtn_);
 
-  // HERO
+  // --- Initialize Hero Section ---
   cleanBtn_.setButtonText("Analyze & Clean Mic");
   cleanBtn_.setColour(juce::TextButton::buttonColourId, Styling::accent);
   cleanBtn_.setColour(juce::TextButton::textColourOffId, juce::Colours::black);
@@ -151,7 +174,7 @@ MainComponent::MainComponent()
   pillAtten_.setJustificationType(juce::Justification::centred);
   addAndMakeVisible(pillAtten_);
 
-  // METERS
+  // --- Initialize Meters ---
   inMeter_.setColours(juce::Colours::black, Styling::accent.darker(0.4f));
   outMeter_.setColours(juce::Colours::black, Styling::accent);
   inMeter_.setBufferSize(256);
@@ -172,7 +195,7 @@ MainComponent::MainComponent()
   lOut_.setJustificationType(juce::Justification::centred);
   addAndMakeVisible(lOut_);
 
-  // CONTROLS
+  // --- Initialize Main Controls ---
   strength_.setRange(0.0, 100.0, 1.0);
   strength_.setValue(50.0);
   strength_.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -192,7 +215,7 @@ MainComponent::MainComponent()
   strengthLabel_->setColour(juce::Label::textColourId, Styling::textDim);
   addAndMakeVisible(strengthLabel_.get());
 
-  // LEFT COLUMN
+  // --- Initialize Side Controls ---
   voiceProtect_.setToggleState(true, juce::dontSendNotification);
   voiceProtect_.setTooltip("Prevents removing human speech.");
   addAndMakeVisible(voiceProtect_);
@@ -204,15 +227,14 @@ MainComponent::MainComponent()
   deltaBtn_.setTooltip("Listen to the removed noise only.");
   addAndMakeVisible(deltaBtn_);
 
-  // NEW: Mic Boost Section
+  // --- Initialize Mic Boost ---
   boostToggle_.setToggleState(false, juce::dontSendNotification);
   boostToggle_.setTooltip("Enables digital Pre-Amp gain.");
   addAndMakeVisible(boostToggle_);
 
   boostSlider_.setRange(0.0, 300.0, 1.0);
   boostSlider_.setValue(100.0);
-  // Use LinearHorizontal to support our new Fader Style
-  boostSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
+  boostSlider_.setSliderStyle(juce::Slider::LinearHorizontal); // Custom Fader
   boostSlider_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
   boostSlider_.setTooltip("Gain amount (0% to 300%)");
   addAndMakeVisible(boostSlider_);
@@ -220,10 +242,10 @@ MainComponent::MainComponent()
   boostLabel_.setText("+100%", juce::dontSendNotification);
   boostLabel_.setFont(juce::Font(14.0f, juce::Font::bold));
   boostLabel_.setColour(juce::Label::textColourId, Styling::accent);
-  boostLabel_.setJustificationType(juce::Justification::centred); // Centered underneath
+  boostLabel_.setJustificationType(juce::Justification::centred);
   addAndMakeVisible(boostLabel_);
 
-  // RIGHT COLUMN MODES
+  // --- Initialize Modes ---
   mode_.addItem("Standard Clean", 1);
   mode_.addItem("Broadcast (Rich)", 2);
   mode_.addItem("Vocal Isolation", 3);
@@ -237,7 +259,7 @@ MainComponent::MainComponent()
   addAndMakeVisible(lStatus_);
 
   setupCallbacks();
-  startTimerHz(30);
+  startTimerHz(30); // Start UI Update loop
 }
 
 MainComponent::~MainComponent()
@@ -246,6 +268,9 @@ MainComponent::~MainComponent()
   shutdownAudio();
 }
 
+// ==============================================================================
+// Layout Engine
+// ==============================================================================
 void MainComponent::resized()
 {
   auto area = getLocalBounds();
@@ -264,38 +289,32 @@ void MainComponent::resized()
   auto cRight = controls.removeFromRight(controls.getWidth() / 2);
   auto cCenter = controls;
 
-  // Left Column (Stacked Toggles)
+  // --- Left Column Layout ---
   cLeft.reduce(10, 5);
   voiceProtect_.setBounds(cLeft.removeFromTop(25));
   humFix_.setBounds(cLeft.removeFromTop(25));
   deltaBtn_.setBounds(cLeft.removeFromTop(25));
+  cLeft.removeFromTop(10); // Spacer
 
-  // FIX: Proper Vertical Stacking for Boost
-  cLeft.removeFromTop(12); // Spacer
-
-  // 1. Toggle Switch
+  // Mic Boost Stack
   boostToggle_.setBounds(cLeft.removeFromTop(25));
-
-  // 2. The Slider (Fader)
   boostSlider_.setBounds(cLeft.removeFromTop(25));
-
-  // 3. The Text (+100%)
   boostLabel_.setBounds(cLeft.removeFromTop(20));
 
-  // Right Column
+  // --- Right Column Layout ---
   cRight.reduce(20, 20);
   cleanBtn_.setBounds(cRight.removeFromTop(40));
   cRight.removeFromTop(10);
   mode_.setBounds(cRight.removeFromTop(30));
 
-  // Center Column
+  // --- Center Column Layout ---
   cCenter.reduce(10, 0);
   lStrength_.setBounds(cCenter.removeFromTop(30));
   strength_.setBounds(cCenter.removeFromTop(80));
   if (strengthLabel_)
     strengthLabel_->setBounds(cCenter);
 
-  // Meters
+  // --- Meter Layout ---
   area.removeFromBottom(20);
   auto badgeRow = area.removeFromTop(40);
   pillAtten_.setBounds(badgeRow.getCentreX() - 60, badgeRow.getCentreY() - 14, 120, 28);
@@ -314,23 +333,28 @@ void MainComponent::paint(juce::Graphics &g)
 {
   g.fillAll(Styling::bgDark);
   auto area = getLocalBounds();
+
+  // Draw Control Deck Background
   auto footerHeight = 30 + 140 + 20;
   auto controlBg = area.removeFromBottom(footerHeight);
 
-  // FIX: Cast integer coordinates to (float)
-  juce::ColourGradient grad(Styling::bgDark, 0.0f, (float)controlBg.getY(),
-                            Styling::panelDark, 0.0f, (float)controlBg.getBottom(), false);
+  // FIX: Use float casts for warning-free drawing
+  juce::ColourGradient grad(Styling::bgDark, 0.0f, (float)controlBg.getY(), Styling::panelDark, 0.0f, (float)controlBg.getBottom(), false);
   g.setGradientFill(grad);
   g.fillRect(controlBg);
 
   g.setColour(juce::Colours::white.withAlpha(0.05f));
-  // FIX: Cast to (float) here too
   g.drawHorizontalLine(controlBg.getY(), 0.0f, (float)getWidth());
 }
 
+// ==============================================================================
+// Audio Processing
+// ==============================================================================
 void MainComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate)
 {
   engine_.prepare(sampleRate, samplesPerBlockExpected);
+
+  // Sync UI state to Engine
   engine_.setBypass(!toggleOn_.getToggleState());
   engine_.setStrength(strength_.getValue() / 100.0);
   engine_.setVoiceProtect(voiceProtect_.getToggleState());
@@ -338,6 +362,7 @@ void MainComponent::prepareToPlay(int samplesPerBlockExpected, double sampleRate
   engine_.setListenDelta(deltaBtn_.getToggleState());
   engine_.setMicBoost(boostToggle_.getToggleState(), (float)boostSlider_.getValue());
   engine_.setOperationMode(mode_.getSelectedId() - 1);
+
   preTap_.setSize(1, samplesPerBlockExpected);
 }
 
@@ -348,13 +373,19 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo &info)
   auto *buf = info.buffer;
   const int n = info.numSamples;
   const int s = info.startSample;
+
+  // 1. Tap Input for Metering
   if (buf->getNumChannels() > 0 && preTap_.getNumSamples() >= n)
   {
     preTap_.copyFrom(0, 0, *buf, 0, s, n);
     const float *chans[1]{preTap_.getReadPointer(0)};
     inMeter_.pushBuffer(chans, 1, n);
   }
+
+  // 2. Process Audio
   engine_.process(*buf, s, n);
+
+  // 3. Tap Output for Metering
   if (buf->getNumChannels() > 0)
   {
     const float *chans[1]{buf->getReadPointer(0, s)};
@@ -362,6 +393,9 @@ void MainComponent::getNextAudioBlock(const juce::AudioSourceChannelInfo &info)
   }
 }
 
+// ==============================================================================
+// Interaction Logic
+// ==============================================================================
 void MainComponent::setupCallbacks()
 {
   toggleOn_.onClick = [this]
@@ -372,16 +406,19 @@ void MainComponent::setupCallbacks()
   };
   cleanBtn_.onClick = [this]
   { startAutoSetup(); };
+
   strength_.onValueChange = [this]
   {
     double val = strength_.getValue();
     engine_.setStrength(val / 100.0);
     lStrength_.setText(juce::String(juce::roundToInt(val)) + "%", juce::dontSendNotification);
   };
+
   voiceProtect_.onClick = [this]
   { engine_.setVoiceProtect(voiceProtect_.getToggleState()); };
   humFix_.onClick = [this]
   { engine_.setHumFix(humFix_.getToggleState()); };
+
   deltaBtn_.onClick = [this]
   {
     bool delta = deltaBtn_.getToggleState();
@@ -392,7 +429,7 @@ void MainComponent::setupCallbacks()
       lStatus_.setText("System Ready.", juce::dontSendNotification);
   };
 
-  // NEW: Boost Callbacks
+  // Mic Boost Handler
   auto updateBoost = [this]
   {
     engine_.setMicBoost(boostToggle_.getToggleState(), (float)boostSlider_.getValue());
@@ -408,6 +445,7 @@ void MainComponent::setupCallbacks()
 
   resetBtn_.onClick = [this]
   {
+    // Force UI updates
     strength_.setValue(50.0, juce::sendNotification);
     toggleOn_.setToggleState(true, juce::dontSendNotification);
     voiceProtect_.setToggleState(true, juce::sendNotification);
@@ -420,6 +458,7 @@ void MainComponent::setupCallbacks()
     engine_.setBypass(false);
     lStatus_.setText("Defaults Restored.", juce::dontSendNotification);
   };
+
   deviceBtn_.onClick = [this]
   {
     auto *dm = &deviceManager;
@@ -434,10 +473,12 @@ void MainComponent::setupCallbacks()
 
 void MainComponent::timerCallback()
 {
+  // Update text
   double db = engine_.getAttenuationDb();
   juce::String txt = juce::String(juce::roundToInt(db)) + " dB";
   pillAtten_.setText(txt, juce::dontSendNotification);
 
+  // Redline Logic
   float peak = engine_.getOutputLevel();
   if (peak > 0.95f)
   {
@@ -450,6 +491,7 @@ void MainComponent::timerCallback()
     lOut_.setText("CLEAN OUTPUT", juce::dontSendNotification);
   }
 
+  // AI Animation
   if (state_ == CleanState::Listening)
   {
     static int dots = 0;

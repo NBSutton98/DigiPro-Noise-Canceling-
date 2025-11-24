@@ -2,180 +2,275 @@
 #include <algorithm>
 #include <cmath>
 
-static inline float mapStrength01_toPostStrength (double s01)
+// Helper: Maps the UI Slider (0-1) to a usable DSP strength value.
+static inline float mapStrength01_toPostStrength(double s01)
 {
     return static_cast<float>(std::clamp(s01, 0.0, 1.0));
 }
 
-void AudioEngine::prepare (double sr, int blockSize)
+void AudioEngine::prepare(double sr, int maxBlockSize)
 {
-    sr_    = sr;
-    block_ = blockSize;
+    sampleRate_ = sr;
+    blockSize_ = maxBlockSize;
 
-    bypass_         = false;
-    strength01_     = 0.50;
-    
-    nlms_.prepare(sr_, 256);
-    stft_.prepare(sr_, blockSize);
-    post_.prepare(sr_);
+    // Default Initial State
+    bypass_ = false;
+    strength01_ = 0.50;
+
+    // Initialize Sub-Processors
+    nlms_.prepare(sampleRate_, 256);
+    stft_.prepare(sampleRate_, blockSize_);
+    post_.prepare(sampleRate_);
     post_.setStrength(mapStrength01_toPostStrength(strength01_));
-    
-    gateGain_.reset(sr_, 0.05);
-    gateGain_.setCurrentAndTargetValue(1.0f); 
 
-    // --- Prepare DSP Chains ---
+    // Initialize Gate (Start Open)
+    gateGain_.reset(sampleRate_, 0.05); // 50ms ramp time
+    gateGain_.setCurrentAndTargetValue(1.0f);
+
+    // --- Initialize DSP Chains ---
     juce::dsp::ProcessSpec spec;
-    spec.sampleRate = sr;
-    spec.maximumBlockSize = blockSize;
-    spec.numChannels = 2; 
+    spec.sampleRate = sampleRate_;
+    spec.maximumBlockSize = blockSize_;
+    spec.numChannels = 2; // Duplicators handle stereo automatically
 
     broadcastEQ_.prepare(spec);
     isolationEQ_.prepare(spec);
-    
-    updateFilters(); 
+
+    updateFilters(); // Load initial coefficients
 }
 
 void AudioEngine::updateFilters()
 {
-    // FIX: Dereference assignment to avoid "inaccessible" errors
-    auto& broadLow = broadcastEQ_.get<0>();
-    *broadLow.state = *juce::dsp::IIR::Coefficients<float>::makeLowShelf(sr_, 150.0f, 0.7f, 1.41f);
+    // We access the filter state directly via the Duplicator.
+    // dereferencing (*state) allows us to assign the new coefficients safely.
 
-    auto& broadHigh = broadcastEQ_.get<1>();
-    *broadHigh.state = *juce::dsp::IIR::Coefficients<float>::makeHighShelf(sr_, 6000.0f, 0.7f, 1.26f);
+    // 1. Broadcast EQ: Boost Bass (Warmth) and Treble (Air)
+    *broadcastEQ_.get<0>().state = *juce::dsp::IIR::Coefficients<float>::makeLowShelf(sampleRate_, 150.0f, 0.7f, 1.41f);
+    *broadcastEQ_.get<1>().state = *juce::dsp::IIR::Coefficients<float>::makeHighShelf(sampleRate_, 6000.0f, 0.7f, 1.26f);
 
-    auto& isoHighPass = isolationEQ_.get<0>();
-    *isoHighPass.state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(sr_, 300.0f);
-
-    auto& isoLowPass = isolationEQ_.get<1>();
-    *isoLowPass.state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(sr_, 3500.0f);
+    // 2. Isolation EQ: Bandpass (Telephone effect)
+    *isolationEQ_.get<0>().state = *juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate_, 300.0f);
+    *isolationEQ_.get<1>().state = *juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate_, 3500.0f);
 }
 
-void AudioEngine::process (juce::AudioBuffer<float>& buf, int start, int numSamples)
+void AudioEngine::process(juce::AudioBuffer<float> &buffer, int start, int numSamples)
 {
-    if (bypass_ || numSamples <= 0) return;
+    if (bypass_ || numSamples <= 0)
+        return;
 
-    // --- 0. MIC BOOST ---
+    // ==============================================================================
+    // STAGE 1: Input Conditioning
+    // ==============================================================================
+
+    // Apply Mic Boost if enabled
     if (micBoostOn_)
     {
-        buf.applyGain(micBoostGain_);
+        buffer.applyGain(micBoostGain_);
     }
 
-    // --- 0.5 SAVE ORIGINAL ---
+    // Save a clean copy of the input if we are in "Delta Listen" mode
     juce::AudioBuffer<float> originalInput;
-    if (listenDelta_) originalInput.makeCopyOf(buf);
+    if (listenDelta_)
+        originalInput.makeCopyOf(buffer);
 
-    // --- 1. AI PROFILING ---
+    // ==============================================================================
+    // STAGE 2: Analysis (AI)
+    // ==============================================================================
     if (isProfiling_)
     {
-        float level = buf.getRMSLevel(0, start, numSamples);
+        // Measure the noise floor RMS
+        float level = buffer.getRMSLevel(0, start, numSamples);
         noiseAccumulator_ += level;
         noiseFrameCount_++;
     }
 
-    // --- 2. SPECTRAL CLEANER ---
-    // FIX: Explicit casts to float to silence MSVC warnings
-    float effectiveStrength = (float)strength01_;
-    
-    if (operationMode_ == 2) 
-        effectiveStrength = std::min(1.0f, (float)(strength01_ * 1.2)); 
+    // ==============================================================================
+    // STAGE 3: Frequency Domain Processing (Spectral Cleaner)
+    // ==============================================================================
 
+    // Calculate effective strength (Boosted slightly in Isolation mode)
+    float effectiveStrength = (float)strength01_;
+    if (operationMode_ == 2)
+        effectiveStrength = std::min(1.0f, (float)(strength01_ * 1.2));
+
+    // Run the STFT (Short-Time Fourier Transform) pipeline
     post_.setStrength(mapStrength01_toPostStrength(effectiveStrength));
-    juce::AudioBuffer<float> subBuf(buf.getArrayOfWritePointers(), buf.getNumChannels(), start, numSamples);
+
+    // Create a sub-view of the buffer for processing
+    juce::AudioBuffer<float> subBuf(buffer.getArrayOfWritePointers(), buffer.getNumChannels(), start, numSamples);
     stft_.processBlock(subBuf, subBuf, post_);
 
-    // --- 3. SMART GATE ---
-    // FIX: Explicit cast to float for threshold calculation
-    float activeThreshold = (float)((strength01_ * strength01_) * 0.05); 
-    
-    int holdSamples = (int)(0.2 * sr_); 
-    gateGain_.reset(sr_, 0.1); 
+    // ==============================================================================
+    // STAGE 4: Time Domain Processing (Smart Noise Gate)
+    // ==============================================================================
 
-    auto* channelData = buf.getWritePointer(0, start);
+    // Threshold Curve: Quadratic (strength^2) for finer control at low levels
+    float activeThreshold = (float)((strength01_ * strength01_) * 0.05);
+
+    // Hold Time: 200ms to prevent chopping off the ends of words
+    int holdSamples = (int)(0.2 * sampleRate_);
+
+    gateGain_.reset(sampleRate_, 0.1); // 100ms release time
+
+    auto *channelData = buffer.getWritePointer(0, start);
+
     for (int i = 0; i < numSamples; ++i)
     {
         float sample = channelData[i];
         float magnitude = std::abs(sample);
         float targetGain = 0.0f;
-        
-        if (magnitude > activeThreshold) { targetGain = 1.0f; gateHoldCounter_ = holdSamples; } 
-        else {
-            if (gateHoldCounter_ > 0) { targetGain = 1.0f; gateHoldCounter_--; }
-            else { targetGain = 0.0f; }
+
+        // Gate Logic with Hysteresis
+        if (magnitude > activeThreshold)
+        {
+            // Open Gate immediately
+            targetGain = 1.0f;
+            gateHoldCounter_ = holdSamples;
         }
+        else
+        {
+            // Signal is quiet. Are we holding?
+            if (gateHoldCounter_ > 0)
+            {
+                targetGain = 1.0f; // Keep open
+                gateHoldCounter_--;
+            }
+            else
+            {
+                targetGain = 0.0f; // Close Gate
+            }
+        }
+
         gateGain_.setTargetValue(targetGain);
         float currentGain = gateGain_.getNextValue();
-        
+
+        // Apply gain to Mono (Left)
         channelData[i] *= currentGain;
-        if (buf.getNumChannels() > 1) {
-            auto* rightData = buf.getWritePointer(1, start);
-            if (rightData) rightData[i] *= currentGain;
+
+        // Apply same gain to Right channel if Stereo
+        if (buffer.getNumChannels() > 1)
+        {
+            auto *rightData = buffer.getWritePointer(1, start);
+            if (rightData)
+                rightData[i] *= currentGain;
         }
     }
 
-    // --- 4. APPLY MODES (EQ) ---
-    juce::dsp::AudioBlock<float> block(buf);
+    // ==============================================================================
+    // STAGE 5: Post-Processing (EQ & Modes)
+    // ==============================================================================
+
+    juce::dsp::AudioBlock<float> block(buffer);
     juce::dsp::AudioBlock<float> contextBlock = block.getSubBlock(start, numSamples);
     juce::dsp::ProcessContextReplacing<float> context(contextBlock);
 
-    if (operationMode_ == 1) // Broadcast
+    if (operationMode_ == 1) // Broadcast Mode
     {
         broadcastEQ_.process(context);
     }
-    else if (operationMode_ == 2) // Isolation
+    else if (operationMode_ == 2) // Isolation Mode
     {
         isolationEQ_.process(context);
     }
 
-    // --- 5. DELTA LOGIC ---
+    // ==============================================================================
+    // STAGE 6: Delta Monitoring (Debug)
+    // ==============================================================================
     if (listenDelta_)
     {
-        buf.applyGain(-1.0f);
-        for (int ch = 0; ch < buf.getNumChannels(); ++ch)
-            buf.addFrom(ch, start, originalInput, ch, start, numSamples);
-        buf.applyGain(1.5f); 
+        // Math: Noise = Original + (Processed * -1)
+        buffer.applyGain(-1.0f);
+        for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
+            buffer.addFrom(ch, start, originalInput, ch, start, numSamples);
+
+        // Slight boost to make the removed noise audible
+        buffer.applyGain(1.5f);
     }
 
-    // --- 6. SOFT CLIPPER & PEAK ---
+    // ==============================================================================
+    // STAGE 7: Safety & Visuals
+    // ==============================================================================
+
     float maxPeak = 0.0f;
-    auto* outL = buf.getWritePointer(0, start);
-    auto* outR = (buf.getNumChannels() > 1) ? buf.getWritePointer(1, start) : nullptr;
+    auto *outL = buffer.getWritePointer(0, start);
+    auto *outR = (buffer.getNumChannels() > 1) ? buffer.getWritePointer(1, start) : nullptr;
+
     for (int i = 0; i < numSamples; ++i)
     {
+        // Soft Clipper (tanh) to prevent digital distortion > 0dB
         outL[i] = std::tanh(outL[i]);
-        if (std::abs(outL[i]) > maxPeak) maxPeak = std::abs(outL[i]);
-        if (outR) { outR[i] = std::tanh(outR[i]); }
+
+        // Track peak for UI Redline
+        if (std::abs(outL[i]) > maxPeak)
+            maxPeak = std::abs(outL[i]);
+
+        if (outR)
+        {
+            outR[i] = std::tanh(outR[i]);
+        }
     }
+
     lastOutputLevel_ = maxPeak;
     attenDb_ = -24.0 * strength01_;
 }
 
-// ... Getters/Setters ...
-void AudioEngine::autoSetupBegin() { isProfiling_ = true; noiseAccumulator_ = 0; noiseFrameCount_ = 0; strength01_ = 0.0; }
-void AudioEngine::autoSetupEnd() {
+// ==============================================================================
+// Setters & Helpers implementation
+// ==============================================================================
+
+void AudioEngine::autoSetupBegin()
+{
+    isProfiling_ = true;
+    noiseAccumulator_ = 0;
+    noiseFrameCount_ = 0;
+    strength01_ = 0.0;
+}
+
+void AudioEngine::autoSetupEnd()
+{
     isProfiling_ = false;
-    if (noiseFrameCount_ > 0) {
-        float db = juce::Decibels::gainToDecibels(noiseAccumulator_ / (float)noiseFrameCount_);
-        if (db > -50.0f) strength01_ = 0.70;
-        else if (db > -70.0f) strength01_ = 0.40;
-        else strength01_ = 0.20;
+    if (noiseFrameCount_ > 0)
+    {
+        float avg = noiseAccumulator_ / (float)noiseFrameCount_;
+        float db = juce::Decibels::gainToDecibels(avg);
+
+        // Smart Calibration Logic
+        if (db > -50.0f)
+            strength01_ = 0.70; // Loud environment
+        else if (db > -70.0f)
+            strength01_ = 0.40; // Moderate
+        else
+            strength01_ = 0.20; // Quiet
     }
 }
-void AudioEngine::setBypass(bool b)       { bypass_ = b; }
-void AudioEngine::setStrength(double s)   { strength01_ = std::clamp(s, 0.0, 1.0); }
-void AudioEngine::setVoiceProtect(bool b) { voiceProtectOn_ = b; }
-void AudioEngine::setHumFix(bool b)       { humFixOn_ = b; }
-void AudioEngine::setListenDelta(bool b)  { listenDelta_ = b; } 
 
-void AudioEngine::setMicBoost(bool on, float amountPercent) {
+void AudioEngine::setBypass(bool b) { bypass_ = b; }
+void AudioEngine::setStrength(double s) { strength01_ = std::clamp(s, 0.0, 1.0); }
+void AudioEngine::setVoiceProtect(bool b) { voiceProtectOn_ = b; }
+void AudioEngine::setHumFix(bool b) { humFixOn_ = b; }
+void AudioEngine::setListenDelta(bool b) { listenDelta_ = b; }
+
+void AudioEngine::setMicBoost(bool on, float amountPercent)
+{
     micBoostOn_ = on;
+    // Map 0-300% to 1.0x - 4.0x gain multiplier
     micBoostGain_ = 1.0f + (amountPercent / 100.0f);
 }
 
-void AudioEngine::setOperationMode(int mode) {
+void AudioEngine::setOperationMode(int mode)
+{
     operationMode_ = mode;
-    updateFilters(); 
+    updateFilters();
 }
 
-void AudioEngine::resetAll() { strength01_ = 0.5; attenDb_ = 0.0; gateGain_.setCurrentAndTargetValue(1.0f); listenDelta_ = false; micBoostOn_ = false; operationMode_ = 0; }
+void AudioEngine::resetAll()
+{
+    strength01_ = 0.5;
+    attenDb_ = 0.0;
+    gateGain_.setCurrentAndTargetValue(1.0f);
+    listenDelta_ = false;
+    micBoostOn_ = false;
+    operationMode_ = 0;
+}
+
 double AudioEngine::getAttenuationDb() const { return attenDb_; }
