@@ -8,7 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_subdirectory(JUCE)
 
 juce_add_plugin(NClite
-    COMPANY_NAME "BCIT Students"    
+    COMPANY_NAME "BCIT_Students"    
     IS_SYNTH FALSE               
     NEEDS_MIDI_INPUT FALSE      
     NEEDS_MIDI_OUTPUT FALSE

@@ -113,6 +113,9 @@ public:
     /** Returns the current reduction amount in Decibels (negative value). */
     double getAttenuationDb() const;
 
+    /** Returns the strength of the input signal */
+    float getStrength() const { return strength01_; }
+
     /** Returns the peak output level (0.0 - 1.0) for clipping detection. */
     float getOutputLevel() const { return lastOutputLevel_; }
 

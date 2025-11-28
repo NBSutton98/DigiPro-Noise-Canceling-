@@ -184,7 +184,7 @@ void AudioEngine::process(juce::AudioBuffer<float> &buffer, int start, int numSa
             buffer.addFrom(ch, start, originalInput, ch, start, numSamples);
 
         // Slight boost to make the removed noise audible
-        buffer.applyGain(1.5f);
+        buffer.applyGain(1.0f);
     }
 
     // ==============================================================================
@@ -229,18 +229,30 @@ void AudioEngine::autoSetupBegin()
 void AudioEngine::autoSetupEnd()
 {
     isProfiling_ = false;
+
+    float avgGain = 0.0f; 
+    noiseAccumulator_ = 0.0f;
+    
     if (noiseFrameCount_ > 0)
     {
-        float avg = noiseAccumulator_ / (float)noiseFrameCount_;
-        float db = juce::Decibels::gainToDecibels(avg);
+        avgGain = noiseAccumulator_ / (float)noiseFrameCount_;
 
-        // Smart Calibration Logic
-        if (db > -50.0f)
-            strength01_ = 0.70; // Loud environment
-        else if (db > -70.0f)
-            strength01_ = 0.40; // Moderate
-        else
-            strength01_ = 0.20; // Quiet
+        float db = juce::Decibels::gainToDecibels(avgGain);
+        const float LOW_DB_THRESHOLD = -80.0f;
+        const float HIGH_DB_THRESHOLD = -40.0f; 
+
+        float clampedDb = juce::jlimit(LOW_DB_THRESHOLD, HIGH_DB_THRESHOLD, db);
+
+        float normalizedStrength = juce::jmap(clampedDb, 
+                                              LOW_DB_THRESHOLD, 
+                                              HIGH_DB_THRESHOLD, 
+                                              0.1f, 
+                                              1.0f  
+                                             );
+
+        strength01_ = normalizedStrength;
+        noiseAccumulator_ = 0.0f;
+        noiseFrameCount_ = 0;
     }
 }
 

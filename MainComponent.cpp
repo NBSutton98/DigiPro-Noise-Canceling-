@@ -205,14 +205,14 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   boostToggle_.setTooltip("Enables digital Pre-Amp gain.");
   addAndMakeVisible(boostToggle_);
 
-  boostSlider_.setRange(0.0, 300.0, 1.0);
-  boostSlider_.setValue(100.0);
+  boostSlider_.setRange(0.0, 200.0, 1.0);
+  boostSlider_.setValue(0.0);
   boostSlider_.setSliderStyle(juce::Slider::LinearHorizontal);
   boostSlider_.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
-  boostSlider_.setTooltip("Gain amount (0% to 300%)");
+  boostSlider_.setTooltip("Gain amount (0% to 200%)");
   addAndMakeVisible(boostSlider_);
 
-  boostLabel_.setText("+100%", juce::dontSendNotification);
+  boostLabel_.setText("+0%", juce::dontSendNotification);
   boostLabel_.setFont(juce::Font(14.0f, juce::Font::bold));
   boostLabel_.setColour(juce::Label::textColourId, Styling::accent);
   boostLabel_.setJustificationType(juce::Justification::centred);
@@ -241,13 +241,12 @@ MainComponent::~MainComponent()
 }
 
 // ==============================================================================
-// Visualizer Bridges (FIXED)
+// Visualizer Bridges 
 // ==============================================================================
 void MainComponent::pushInputToMeters(const juce::AudioBuffer<float> &buffer)
 {
   if (buffer.getNumChannels() > 0)
   {
-    // FIX: Create an array of pointers to satisfy the function signature
     const float *channelData[] = {buffer.getReadPointer(0)};
     inMeter_.pushBuffer(channelData, 1, buffer.getNumSamples());
   }
@@ -257,7 +256,6 @@ void MainComponent::pushOutputToMeters(const juce::AudioBuffer<float> &buffer)
 {
   if (buffer.getNumChannels() > 0)
   {
-    // FIX: Create an array of pointers to satisfy the function signature
     const float *channelData[] = {buffer.getReadPointer(0)};
     outMeter_.pushBuffer(channelData, 1, buffer.getNumSamples());
   }
@@ -396,7 +394,7 @@ void MainComponent::setupCallbacks()
     mode_.setSelectedId(1, juce::sendNotification);
     deltaBtn_.setToggleState(false, juce::sendNotification);
     boostToggle_.setToggleState(false, juce::sendNotification);
-    boostSlider_.setValue(100.0, juce::dontSendNotification);
+    boostSlider_.setValue(0.0, juce::dontSendNotification);
 
     processor.engine.resetAll();
     processor.engine.setBypass(false);
@@ -458,26 +456,30 @@ void MainComponent::finishAutoSetup()
 {
   if (state_ != CleanState::Listening)
     return;
+
   processor.engine.autoSetupEnd();
+
   float noiseFloor = processor.engine.getDetectedNoiseFloor();
   float db = juce::Decibels::gainToDecibels(noiseFloor);
-  float recommendedStrength = 50.0f;
+
+  float newStrength01 = processor.engine.getStrength();
+  double recommendedStrength = newStrength01 * 100.0; 
+  
   juce::String statusMsg = "Setup complete. ";
+
   if (db > -50.0f)
   {
-    recommendedStrength = 75.0f;
-    statusMsg += "High background noise detected.";
+    statusMsg += "High background noise detected (Loud Environment).";
   }
   else if (db > -70.0f)
   {
-    recommendedStrength = 40.0f;
-    statusMsg += "Moderate background noise detected.";
+    statusMsg += "Moderate background noise detected (Quiet Room).";
   }
   else
   {
-    recommendedStrength = 20.0f;
-    statusMsg += "Room is quiet.";
+    statusMsg += "Low noise floor detected (Silent Recording).";
   }
+
   strength_.setValue(recommendedStrength, juce::sendNotification);
   lStatus_.setText(statusMsg, juce::dontSendNotification);
   state_ = CleanState::Ready;
