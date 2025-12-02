@@ -71,7 +71,7 @@ This project uses **CMake** and the **JUCE Framework**.
 1.  **Audio Settings:** Select your Microphone and Headphones (Output). *Note: Use headphones to prevent feedback loops.*
 2.  **Mic Boost:** Use the fader on the left to increase gain if your waveform is too thin.
 3.  **Analyze & Clean:** Click the blue button and remain silent for 3 seconds. The AI will measure your room noise.
-4.  **Strength Knob:**
+4.  **Main Strength Knob / Band control knobs:**
     * **0%:** Passthrough (0dB reduction).
     * **50%:** Balanced reduction (-12dB target).
     * **100%:** Aggressive reduction (-40dB target).
@@ -85,7 +85,7 @@ This project uses **CMake** and the **JUCE Framework**.
 * `MainComponent.cpp/hpp`: The GUI implementation, custom LookAndFeel, and visualizations.
 * `STFTProcessor`: Handles the overlap-add math and FFT windowing.
 * `WienerPost`: Implements the spectral subtraction algorithm.
-* `NLMSFilter`: (Experimental) Adaptive filter for reference-channel cancellation.
+* `NLMSFilter`: (Experimental) Adaptive filter for reference-channel cancellation. Currently not in use for presentation purposes. 
 
 ---
 
