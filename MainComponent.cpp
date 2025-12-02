@@ -121,9 +121,7 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   lnf_ = std::make_unique<Styling::ModernLNF>();
   setLookAndFeel(lnf_.get());
 
-  setSize(900, 600);
-
-  // --- Initialize Header ---
+  // --- Initialize Header, Hero, Meters, and Side Controls (Existing) ---
   toggleOn_.setButtonText("Processing Active");
   toggleOn_.setToggleState(true, juce::dontSendNotification);
   toggleOn_.setTooltip("Master Bypass.");
@@ -132,7 +130,6 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   resetBtn_.setButtonText("Reset Defaults");
   addAndMakeVisible(resetBtn_);
 
-  // --- Initialize Hero Section ---
   cleanBtn_.setButtonText("Analyze & Clean Mic");
   cleanBtn_.setColour(juce::TextButton::buttonColourId, Styling::accent);
   cleanBtn_.setColour(juce::TextButton::textColourOffId, juce::Colours::black);
@@ -145,7 +142,6 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   pillAtten_.setJustificationType(juce::Justification::centred);
   addAndMakeVisible(pillAtten_);
 
-  // --- Initialize Meters ---
   inMeter_.setColours(juce::Colours::black, Styling::accent.darker(0.4f));
   outMeter_.setColours(juce::Colours::black, Styling::accent);
   inMeter_.setBufferSize(256);
@@ -168,7 +164,7 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   lOut_.setJustificationType(juce::Justification::centred);
   addAndMakeVisible(lOut_);
 
-  // --- Initialize Main Controls ---
+  // --- Initialize Main Controls (Master Knob) ---
   strength_.setRange(0.0, 100.0, 1.0);
   strength_.setValue(50.0);
   strength_.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
@@ -182,7 +178,7 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   lStrength_.setColour(juce::Label::textColourId, Styling::accent);
   addAndMakeVisible(lStrength_);
 
-  strengthLabel_.reset(new juce::Label("sLab", "NOISE REDUCTION"));
+  strengthLabel_.reset(new juce::Label("sLab", "MASTER STRENGTH"));
   strengthLabel_->setFont(juce::Font(11.0f));
   strengthLabel_->setJustificationType(juce::Justification::centred);
   strengthLabel_->setColour(juce::Label::textColourId, Styling::textDim);
@@ -193,7 +189,7 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   voiceProtect_.setTooltip("Prevents removing human speech.");
   addAndMakeVisible(voiceProtect_);
 
-  humFix_.setToggleState(true, juce::dontSendNotification);
+  humFix_.setToggleState(false, juce::dontSendNotification);
   humFix_.setTooltip("Removes 60Hz ground loop hum.");
   addAndMakeVisible(humFix_);
 
@@ -231,8 +227,49 @@ MainComponent::MainComponent(NCliteAudioProcessor &p)
   lStatus_.setJustificationType(juce::Justification::centred);
   addAndMakeVisible(lStatus_);
 
+  // Initialize Multiband Controls (4 Knobs)
+  const juce::String bandNames[] = {"1. LOW (<300Hz)", "2. LOW-MID (300-1.5kHz)", "3. MID-HIGH (1.5-5kHz)", "4. HIGH (>5kHz)"};
+
+  for (int i = 0; i < 4; ++i)
+  {
+    bandSliders_[i].setRange(0.0, 100.0, 1.0);
+    bandSliders_[i].setValue(50.0);
+    bandSliders_[i].setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);
+    bandSliders_[i].setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
+    bandSliders_[i].setTooltip("Surgical noise reduction strength for the " + bandNames[i] + " band.");
+    addAndMakeVisible(bandSliders_[i]);
+
+    bandLabels_[i].reset(new juce::Label("", bandNames[i]));
+    bandLabels_[i]->setFont(juce::Font(10.0f));
+    bandLabels_[i]->setJustificationType(juce::Justification::centred);
+    bandLabels_[i]->setColour(juce::Label::textColourId, Styling::textDim);
+    addAndMakeVisible(bandLabels_[i].get());
+  }
+
   setupCallbacks();
   startTimerHz(30);
+
+  // --- Initial Parameter Sync (Updated to use Multiband Setters) ---
+  processor.engine.setBypass(!toggleOn_.getToggleState());
+
+  // Use setMasterStrength
+  processor.engine.setMasterStrength(strength_.getValue() / 100.0);
+
+  // Send initial values for all four band knobs
+  for (int i = 0; i < 4; ++i)
+  {
+    processor.engine.setBandStrength(i, bandSliders_[i].getValue() / 100.0);
+  }
+
+  processor.engine.setVoiceProtect(voiceProtect_.getToggleState());
+  processor.engine.setHumFix(humFix_.getToggleState());
+  processor.engine.setListenDelta(deltaBtn_.getToggleState());
+  processor.engine.setMicBoost(
+      boostToggle_.getToggleState(),
+      (float)boostSlider_.getValue());
+  processor.engine.setOperationMode(mode_.getSelectedId() - 1);
+
+  setSize(900, 600);
 }
 
 MainComponent::~MainComponent()
@@ -241,7 +278,7 @@ MainComponent::~MainComponent()
 }
 
 // ==============================================================================
-// Visualizer Bridges 
+// Visualizer Bridges (Keep as is)
 // ==============================================================================
 void MainComponent::pushInputToMeters(const juce::AudioBuffer<float> &buffer)
 {
@@ -276,7 +313,14 @@ void MainComponent::resized()
   lStatus_.setBounds(footer);
 
   area.reduce(20, 10);
+
+  // Define the area for the 4 Multiband Knobs (120px tall)
+  auto multibandRow = area.removeFromBottom(120).reduced(10, 5);
+
+  // Define the original controls area (140px tall)
   auto controls = area.removeFromBottom(140);
+
+  // Now, split the controls area
   auto cLeft = controls.removeFromLeft(controls.getWidth() / 3);
   auto cRight = controls.removeFromRight(controls.getWidth() / 2);
   auto cCenter = controls;
@@ -287,7 +331,6 @@ void MainComponent::resized()
   humFix_.setBounds(cLeft.removeFromTop(25));
   deltaBtn_.setBounds(cLeft.removeFromTop(25));
   cLeft.removeFromTop(10);
-
   // Mic Boost Stack
   boostToggle_.setBounds(cLeft.removeFromTop(25));
   boostSlider_.setBounds(cLeft.removeFromTop(25));
@@ -299,7 +342,7 @@ void MainComponent::resized()
   cRight.removeFromTop(10);
   mode_.setBounds(cRight.removeFromTop(30));
 
-  // --- Center Column Layout ---
+  // --- Center Column Layout (Master Strength) ---
   cCenter.reduce(10, 0);
   lStrength_.setBounds(cCenter.removeFromTop(30));
   strength_.setBounds(cCenter.removeFromTop(80));
@@ -319,6 +362,29 @@ void MainComponent::resized()
   inMeter_.setBounds(inRect);
   lOut_.setBounds(outRect.removeFromTop(20));
   outMeter_.setBounds(outRect);
+
+  // ==============================================================================
+  // FINAL Multiband Knob Layout
+  // ==============================================================================
+
+  int knobWidth = multibandRow.getWidth() / 4;
+  int knobSize = 80;
+
+  for (int i = 0; i < 4; ++i)
+  {
+    auto bandArea = multibandRow.removeFromLeft(knobWidth);
+    bandArea.reduce(5, 0);
+
+    // Label placement (top 20px)
+    bandLabels_[i]->setBounds(bandArea.removeFromTop(20));
+
+    // Slider placement (centered in remaining space)
+    bandSliders_[i].setBounds(
+        bandArea.getCentreX() - knobSize / 2,
+        bandArea.getY() + 5,
+        knobSize,
+        knobSize);
+  }
 }
 
 void MainComponent::paint(juce::Graphics &g)
@@ -326,13 +392,16 @@ void MainComponent::paint(juce::Graphics &g)
   g.fillAll(Styling::bgDark);
   auto area = getLocalBounds();
 
-  auto footerHeight = 30 + 140 + 20;
-  auto controlBg = area.removeFromBottom(footerHeight);
+  // Adjusted footerHeight based on new multiband row (30 + 140 + 20 + 120)
+  auto totalControlsHeight = 30 + 140 + 120 + 20;
+  auto controlBg = area.removeFromBottom(totalControlsHeight);
 
+  // Draw gradient background over the main control area and multiband area
   juce::ColourGradient grad(Styling::bgDark, 0.0f, (float)controlBg.getY(), Styling::panelDark, 0.0f, (float)controlBg.getBottom(), false);
   g.setGradientFill(grad);
   g.fillRect(controlBg);
 
+  // Draw separator line above the meters
   g.setColour(juce::Colours::white.withAlpha(0.05f));
   g.drawHorizontalLine(controlBg.getY(), 0.0f, (float)getWidth());
 }
@@ -351,12 +420,23 @@ void MainComponent::setupCallbacks()
   cleanBtn_.onClick = [this]
   { startAutoSetup(); };
 
+  // MASTER STRENGTH CALLBACK
   strength_.onValueChange = [this]
   {
     double val = strength_.getValue();
-    processor.engine.setStrength(val / 100.0);
+    processor.engine.setMasterStrength(val / 100.0);
     lStrength_.setText(juce::String(juce::roundToInt(val)) + "%", juce::dontSendNotification);
   };
+
+  // Multiband Knob Callbacks
+  for (int i = 0; i < 4; ++i)
+  {
+    bandSliders_[i].onValueChange = [this, i]
+    {
+      double val = bandSliders_[i].getValue();
+      processor.engine.setBandStrength(i, val / 100.0);
+    };
+  }
 
   voiceProtect_.onClick = [this]
   { processor.engine.setVoiceProtect(voiceProtect_.getToggleState()); };
@@ -386,9 +466,17 @@ void MainComponent::setupCallbacks()
     processor.engine.setOperationMode(mode_.getSelectedId() - 1);
   };
 
+  // Reset Button
   resetBtn_.onClick = [this]
   {
     strength_.setValue(50.0, juce::sendNotification);
+
+    // Reset the 4 multiband sliders
+    for (int i = 0; i < 4; ++i)
+    {
+      bandSliders_[i].setValue(50.0, juce::sendNotification);
+    }
+
     toggleOn_.setToggleState(true, juce::dontSendNotification);
     voiceProtect_.setToggleState(true, juce::sendNotification);
     mode_.setSelectedId(1, juce::sendNotification);
@@ -452,6 +540,7 @@ void MainComponent::startAutoSetup()
                               { if (safe != nullptr) safe->finishAutoSetup(); });
 }
 
+// finishAutoSetup must read and apply 4 band strengths
 void MainComponent::finishAutoSetup()
 {
   if (state_ != CleanState::Listening)
@@ -459,12 +548,17 @@ void MainComponent::finishAutoSetup()
 
   processor.engine.autoSetupEnd();
 
+  // The processor sets the new master strength and the 4 band strengths internally.
+  float newMasterStrength = processor.engine.getStrength();
+
+  // Get the new band strengths from the processor
+  std::array<double, 4> newBandStrengths = processor.engine.getBandStrengths();
+
   float noiseFloor = processor.engine.getDetectedNoiseFloor();
   float db = juce::Decibels::gainToDecibels(noiseFloor);
 
-  float newStrength01 = processor.engine.getStrength();
-  double recommendedStrength = newStrength01 * 100.0; 
-  
+  double recommendedMasterStrength = newMasterStrength * 100.0;
+
   juce::String statusMsg = "Setup complete. ";
 
   if (db > -50.0f)
@@ -480,7 +574,13 @@ void MainComponent::finishAutoSetup()
     statusMsg += "Low noise floor detected (Silent Recording).";
   }
 
-  strength_.setValue(recommendedStrength, juce::sendNotification);
+  // Apply new strength values to the UI
+  strength_.setValue(recommendedMasterStrength, juce::sendNotification);
+  for (int i = 0; i < 4; ++i)
+  {
+    bandSliders_[i].setValue(newBandStrengths[i] * 100.0, juce::sendNotification);
+  }
+
   lStatus_.setText(statusMsg, juce::dontSendNotification);
   state_ = CleanState::Ready;
   cleanBtn_.setEnabled(true);

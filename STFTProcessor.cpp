@@ -72,10 +72,12 @@ void STFTProcessor::processBlock(const juce::AudioBuffer<float> &input,
             // E. Inverse FFT (Frequency -> Time)
             fft_.performRealOnlyInverseTransform(fftWorkBuffer_.data());
 
+            window_.multiplyWithWindowingTable(fftWorkBuffer_.data(), fftSize_);
+
             // F. Overlap-Add (OLA) Reconstruction
             // Scale factor compensates for window energy loss and overlap gain.
             // For 75% Hann overlap, 1.5f is a typical scaling approximation.
-            const float windowCorrection = 1.0f / 1.5f;
+            const float windowCorrection = 1.0f / 0.66f;
 
             idx = fifoIndex_ - fftSize_;
             if (idx < 0)

@@ -65,5 +65,8 @@ private:
     std::unique_ptr<juce::LookAndFeel> lnf_;
     juce::TooltipWindow tooltipWindow;
 
+    juce::Slider bandSliders_[4];
+    std::unique_ptr<juce::Label> bandLabels_[4];
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainComponent)
 };

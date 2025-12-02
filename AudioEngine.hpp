@@ -59,12 +59,6 @@ public:
     void setBypass(bool shouldBypass);
 
     /**
-     * @brief Sets the master strength (0.0 to 1.0).
-     * Affects both the Spectral Subtraction aggression and the Noise Gate threshold.
-     */
-    void setStrength(double strengthPercentage);
-
-    /**
      * @brief Prevents the algorithm from filtering frequencies in the human vocal range.
      * Helps preserve clarity when noise reduction is aggressive.
      */
@@ -114,7 +108,16 @@ public:
     double getAttenuationDb() const;
 
     /** Returns the strength of the input signal */
-    float getStrength() const { return strength01_; }
+    void setMasterStrength(double strengthPercentage); 
+
+    // Individual Band Strength Setter
+    void setBandStrength(int bandIndex, double strengthPercentage);
+
+    // Getter for the 4 band strengths (Needed by MainComponent for autoSetupEnd)
+    std::array<double, 4> getBandStrengths() const; 
+
+    // Declaration for the updated getStrength()
+    float getStrength() const;
 
     /** Returns the peak output level (0.0 - 1.0) for clipping detection. */
     float getOutputLevel() const { return lastOutputLevel_; }
@@ -127,15 +130,17 @@ private:
     int blockSize_{0};
 
     // --- Sub-Processors ---
-    NLMSFilter nlms_;    // Adaptive filter (currently reserved for future ref channel use)
+    NLMSFilter nlms_;    // Adaptive filter
     STFTProcessor stft_; // Frequency Domain Processor (Overlap-Add)
     WienerPost post_;    // Spectral Subtraction Logic
+    juce::AudioBuffer<float> monoScratch_;
 
     // --- Parameters ---
     bool bypass_{false};
-    double strength01_{0.5};
+    double masterStrength01_{0.5}; 
+    std::array<double, 4> bandStrengths_{0.5, 0.5, 0.5, 0.5};
     bool voiceProtectOn_{true};
-    bool humFixOn_{true};
+    bool humFixOn_{false};
     bool listenDelta_{false};
 
     bool micBoostOn_{false};
@@ -144,13 +149,20 @@ private:
 
     // --- DSP Filters (EQ) ---
     // We use ProcessorDuplicator to ensure the filter state is accessible and thread-safe.
-    using FilterDup = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>, juce::dsp::IIR::Coefficients<float>>;
+    using FilterDup = juce::dsp::ProcessorDuplicator<juce::dsp::IIR::Filter<float>,
+                                                     juce::dsp::IIR::Coefficients<float>>;
 
     // Chain 1: Broadcast Mode (Low Shelf + High Shelf)
     juce::dsp::ProcessorChain<FilterDup, FilterDup> broadcastEQ_;
 
     // Chain 2: Isolation Mode (High Pass + Low Pass)
     juce::dsp::ProcessorChain<FilterDup, FilterDup> isolationEQ_;
+
+    juce::dsp::ProcessorChain<FilterDup, FilterDup> humFilter_;
+
+    using BandAnalyzer = juce::dsp::ProcessorChain<FilterDup, FilterDup>; 
+    std::array<BandAnalyzer, 4> bandAnalyzers_;
+    std::array<float, 4> noiseAccumulators_{0.0f};
 
     // --- AI State ---
     std::atomic<bool> isProfiling_{false};
