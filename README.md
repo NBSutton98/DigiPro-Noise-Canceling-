@@ -4,9 +4,6 @@
 
 **NClite** is a high-performance, low-latency audio processing application designed to isolate human speech from complex background noise. Unlike standard gates, NClite uses a **hybrid DSP pipeline** combining spectral subtraction with time-domain hysteresis to clean audio in real-time.
 
-![NClite Interface](screenshot.png)
-*(Add a screenshot of your app here named screenshot.png)*
-
 ## 🚀 Key Features
 
 * **🧠 AI Environmental Profiling:** Automatically listens to room tone for 3 seconds to calibrate thresholds based on RMS magnitude and noise floor density.
